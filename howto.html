@@ -1,0 +1,336 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Gathering and Charting Temperatures using a RaspberryPi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Le styles -->
+    <link href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <style type="text/css">
+      body {
+        padding-top: 60px;
+        padding-bottom: 40px;
+      }
+      pre {
+        font-size: 10px;
+        line-height: 15px;
+      }
+    </style>
+    <link href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap-responsive.min.css" rel="stylesheet">
+
+    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <!-- Le fav and touch icons -->
+    <link rel="shortcut icon" href="ico/favicon.ico">
+
+  </head>
+
+  <body>
+
+    <div class="navbar navbar-inverse navbar-fixed-top">
+         <div class="navbar-inner">
+           <div class="container-fluid">
+
+             <a class="brand" href="index.html">Sam's Benchtest Temperatures</a>
+             
+             <div class="nav-collapse collapse">
+               <ul class="nav">
+                 <!--<li class="active"><a href="index.html">Home</a></li>-->
+                 <li class="active"><a href="howto.html">HowTo</a></li>
+                 <!--<li><a href="#contact">Contact</a></li>-->
+               </ul>
+             </div>
+             
+           </div>
+         </div>
+       </div>
+
+       <div class="container-fluid">
+         <div class="row-fluid">
+           <div class="span2">
+             <div class="well sidebar-nav">
+               <ul class="nav nav-list">
+                 <li class="nav-header">Temperature</li>
+                  <li><a href="index.html?3h">Last 3h</a></li>
+                  <li><a href="index.html">Last 24h</a></li>
+                  <li><a href="index.html?48h">Last 2 Days</a></li>
+                  <li><a href="index.html?1w">Last Week</a></li>
+                  <li><a href="index.html?1m">Last Month</a></li>
+                  <li><a href="index.html?3m">Last 3 Month</a></li>
+                  <li><a href="index.html?1y">Last Year</a></li>
+               </ul>
+             </div><!--/.well -->
+           </div><!--/span-->
+           <div class="span10">
+             <div class="row-fluid">
+                <h1>Creating a Raspberry Pi based temperature datalogger</h1>
+				<h2>Gathering and Charting Temperatures using a RaspberryPi</h2>
+                <h3>Objective</h3>
+				<p> Creating a Raspberry Pi based temperature datalogger
+				<ol>
+				<li>Version 1 - Single temperature sensor with RPi based webserver and graphing</li>
+				<li>Version 2 - Duel temperature sensors with RPi based webserver and graphing</li>
+				<li>Version 3 - Duel temperature sensors with RPi based webserver and graphing, Added relay for trigger external water pump</li>
+				</ol>
+
+                <p>Meanwhile I started looking at thermal sensors that could work with the RaspberryPi GPIO and very soon I found a very cheap way to do it, using the One Wire <b>DS18B20</b> sensor.
+
+                <h3>Hardware needed</h3>
+				<ol>
+				<li>Raspberry Pi, Power supply, SD Storage Card</li>
+				<li>DS18B20 temperature sensor - I choose non-waterproof type</li>
+				<li>4.7kΩ resistor</li>
+				<li>cables, breadboard</li>
+				</ol>
+				<h3>Optional Hardware needed</h3>
+				<ol>
+				<li>WiFi Adapter</li>
+				</ol>
+
+
+                <h3>Software Used</h3>
+				<ol>
+				<li>lighttpd - lightweight web server for Raspbian -  The HTML/XML are served directly from my RaspberryPi running Lighttpd.</li>
+				<li>Python 3.3</li>
+				<li>python-rrdtool</li>
+				<li><a href="http://oss.oetiker.ch/rrdtool/">RRDTool</a>Graphing DB</li> 
+				<li>Javascript - Most of the Javascript and CSS libraries are served directly from Cloudflare CDNJS, this is done to offload resources from the small RaspberryPi and speed up access time. -- Once indepentent of a wifi network, all JS will need to move to RPi</li>
+				<li><a href="www.highcharts.com">Highcharts</a> So all the charting is done client side using the nice looking javascript library </li>
+				<li><a href="getbootstrap.com/">getbootstrap.com</a>Bootstrap - The Template used in this site.</li>
+				</ol>
+
+				<h4>Some Commands</h4>
+				<p>Install lighttpd
+				<pre>$ sudo apt-get install lighttd</pre>
+				<p>Install python-rrdtool
+				<pre>$ sudo apt-get install python-rrdtool</pre>
+							
+				<h4>Key Directories & files</h4>
+				<ul>
+                  <li>/home/pi/DS18B20/
+				  <li>/home/pi/xively_tutorial/.envs/venv/lib/python2.7/site-packages
+				  <li>/home/pi/DS18B20/temperatures.rrd
+				  <li>/var/www/DS18B20/data/
+                  <li>
+                </ul>							
+				
+
+                <h3>Reading the data from the DS18B20 Sensor</h3>
+
+                <p>I decided to load the required modules on boot, so edit the /etc/modules file and add both modules there. That way I will never need to worry about loading the modules again (even after reboots).
+				<pre>$ pi@raspi2 /var/www/DS18B20/data $ cat /etc/modules
+# /etc/modules: kernel modules to load at boot time.
+#
+# This file contains the names of kernel modules that should be loaded
+# at boot time, one per line. Lines beginning with "#" are ignored.
+# Parameters can be specified after the module name.
+
+snd-bcm2835
+w1-gpio
+w1-therm</pre>
+
+                <p>Each sensor creates a folder inside /sys/bus/w1/devices/, it should be 28-XXXXXXXXXX (each sensor has its own ID), and inside that folder you should find a file called w1_slave, there at the end of the second line (after the "t=" part) you'll have the current reading. 
+				<h4>My Sensors</h4>
+				<ol>
+				<li>DS18B20 Sensor 1 = 28-000005e34189</li>
+				<li>DS18B20 Sensor 2 = 28-XXXXXXXXXX - TBA</li>
+				</ol>
+				
+				
+                <pre>$ cat /sys/bus/w1/devices/28-000005e34189/w1_slave
+37 01 4b 46 7f ff 09 10 26 : crc=26 YES
+37 01 4b 46 7f ff 09 10 26 t=19437</pre>
+
+                <p>There is an implicit decimal point after the first two digits, so the above means 19.437&#176;C. Also notice the "crc=31 YES" bit. If that ends with "NO" then the CRC (cyclical redundancy check, i.e. error-detecting bits) indicate a data error and you should discard the reading and retry. 
+
+                <h3>Storing the data</h3>
+
+                <p>Now that I could read the temperature from the sensors I needed a way to store the information. For this I chose the <a href="http://oss.oetiker.ch/rrdtool/">RRDTool</a> package to manage the data. Its a circular (RR in RRD stands for Round Robin) database that lets you store a predefined amount of data. After initial creation of the DB it is as big as it will ever get and just contains "unknown" data.
+
+                <p>The 'rrdtool create' command is used to setup the database. Here's the setup I used:</p>
+
+                <pre>$rrdtool create /home/pi/DS18B20/temperatures.rrd --start N --step 300 \
+DS:temp:GAUGE:600:0:50 \
+RRA:AVERAGE:0.5:1:288 \
+RRA:AVERAGE:0.5:3:672 \
+RRA:AVERAGE:0.5:12:8880</pre>
+
+                <p>This creates a DB that will store data every 5 minutes and keep it in the following way:
+
+                <ul>
+                  <li>1 day - 5-minute resolution
+                  <li>1 week - 15-minute resolution
+                  <li>1 year - 1-hour resolution
+                </ul>
+
+                <p>Create a simple python script (/home/pi/DS18B20/read_temp.py) that reads the lines from the w1_slave file and stores the temperature reading in the rrd database.
+                  
+                <pre>pi@raspi2 ~/DS18B20 $ cat read_temp.py
+#!/usr/bin/python
+import sys
+sys.path.append('/home/pi/xively_tutorial/.envs/venv/lib/python2.7/site-packages')
+import rrdtool
+
+database_file = "/home/pi/DS18B20/temperatures.rrd"
+MIN_TEMP = -100
+
+def read_temperature():
+  # open/read/close the file with the temperature
+  tfile = open("/sys/devices/w1_bus_master1/28-000005e34189/w1_slave")
+  text = tfile.read()
+  tfile.close()
+
+  # split the two lines
+  lines = text.split("\n")
+
+  # make sure the crc is valid
+  if lines[0].find("YES") > 0:
+    # get the 9th (10th) chunk of text and lose the t= bit
+    temp = float((lines[1].split(" ")[9])[2:])
+    # add a decimal point
+    temp /= 1000
+    return temp
+  return MIN_TEMP-1
+
+current_temp = read_temperature()
+
+if current_temp >= MIN_TEMP:
+  rrdtool.update(database_file, "N:%f" % current_temp)</pre>
+  
+<p>The lines below were needed to allow python to find the rrdmodule correctly.  Something I probably need to fix.
+                  
+                <pre>import sys
+sys.path.append('/home/pi/xively_tutorial/.envs/venv/lib/python2.7/site-packages') </pre> 
+  
+
+                <p>This script runs through the 'pi' user crontab file every 5 minutes. 				
+				<pre>$ crontab -l
+#
+#
+*/5 * * * *  /usr/bin/python /home/pi/DS18B20/read_temp.py</pre>
+
+                <h3>Creating the Graphs</h3>
+                <p>Once you have some data in your temperatures.rrd database it is time to create some charts. RRDTool comes with a built-in graphics engine that can be utilized to easily create some charts, but they don't look very appealing and they require some CPU power, which is limited on a device like the RaspberryPi.
+                So all the charting is done client side using the nice looking javascript library <a href="www.highcharts.com">Highcharts</a>. To do that the data has to be exported from the RRDTool database.
+
+                <p>Setup additional cron jobs to export the data in XML format, the 'rrdtool xport' does that. The periodicity is based on the timespan being exported (no need to export 1 year of data every 5 minutes, no one would notice any difference), that way I also save CPU cycles.
+
+                <pre>*/5 * * * *  /usr/bin/python /home/pi/DS18B20/read_temp.py
+*/5 * * * * /bin/sleep 10 && /usr/bin/rrdtool xport -s now-3h -e now --step 300 DEF:a=/home/pi/DS18B20/temperatures.rrd:temp:AVERAGE XPORT:a:"BenchTest" > /var/www/DS18B20/data/DS18B203h.xml
+*/5 * * * * /bin/sleep 10 && /usr/bin/rrdtool xport -s now-24h -e now --step 900 DEF:a=/home/pi/DS18B20/temperatures.rrd:temp:AVERAGE XPORT:a:"BenchTest" > /var/www/DS18B20/data/DS18B2024h.xml
+32 * * * * /usr/bin/rrdtool xport -s now-48h -e now --step 1800 DEF:a=/home/pi/DS18B20/temperatures.rrd:temp:AVERAGE XPORT:a:"BenchTest" > /var/www/DS18B20/data/DS18B2048h.xml
+38 */4 * * * /usr/bin/rrdtool xport -s now-8d -e now --step 7200 DEF:a=/home/pi/DS18B20/temperatures.rrd:temp:AVERAGE XPORT:a:"BenchTest" > /var/www/DS18B20/data/DS18B201w.xml
+2 3,15 * * * /usr/bin/rrdtool xport -s now-1month -e now --step 10800 DEF:a=/home/pi/DS18B20/temperatures.rrd:temp:AVERAGE XPORT:a:"BenchTest" > /var/www/DS18B20/data/DS18B201m.xml
+8 3,15 * * * /usr/bin/rrdtool xport -s now-3month -e now --step 43200 DEF:a=/home/pi/DS18B20/temperatures.rrd:temp:AVERAGE XPORT:a:"BenchTest" > /var/www/DS18B20/data/DS18B203m.xml
+18 4 * * * /usr/bin/rrdtool xport -s now-1y -e now --step 86400 DEF:a=/home/pi/DS18B20/temperatures.rrd:temp:AVERAGE XPORT:a:"BenchTest" > /var/www/DS18B20/data/DS18B201y.xml</pre>
+
+                <p>This results in a bunch of xml files. I use the jQuery.get method to get the contents of the xml files, parse the returned values, add the results to the series members of the options object, and create the chart:</p>
+
+				<pre>$ ll /var/www/DS18B20/data/
+total 128
+drwxr-xr-x 2 pi pi  4096 Jul 12 13:36 .
+drwxr-xr-x 3 pi pi  4096 Jul 12 09:32 ..
+-rw-r--r-- 1 pi pi 10672 Jul 12 15:02 DS18B201m.xml
+-rw-r--r-- 1 pi pi  4491 Jul 12 16:38 DS18B201w.xml
+-rw-r--r-- 1 pi pi 16021 Jul 12 10:51 DS18B201y.xml
+-rw-r--r-- 1 pi pi  4841 Jul 12 18:15 DS18B2024h.xml
+-rw-r--r-- 1 pi pi  2339 Jul 12 18:15 DS18B203h.xml
+-rw-r--r-- 1 pi pi  8152 Jul 12 15:08 DS18B203m.xml
+-rw-r--r-- 1 pi pi  4634 Jul 12 17:32 DS18B2048h.xml
+-rw-r--r-- 1 pi pi  6551 Jul 12 12:59 index.html</pre>
+				
+		
+				
+                <pre>$.ajax({
+  type: "GET",
+  url: "data/temps24h.xml",
+  dataType: "xml",
+  success: function(xml) {
+      var series = []
+
+      //define series
+      $(xml).find("entry").each(function() {
+          var seriesOptions = {
+              name: $(this).text(),
+              data: []
+          };
+          options.series.push(seriesOptions);
+      });
+
+      //populate with data
+      $(xml).find("row").each(function() {
+          var t = parseInt($(this).find("t").text()) * 1000
+
+          $(this).find("v").each(function(index) {
+              var v = parseFloat($(this).text())
+              v = v || null
+              if (v != null) {
+                  options.series[index].data.push([t, v])
+              };
+          });
+      });
+
+      options.title.text = "Temperatures of the last 24h"
+      $.each(series, function(index) {
+          options.series.push(series[index]);
+      });
+
+      chart = new Highcharts.Chart(options);
+  }
+});</pre>
+                  
+                <p>Some pages also have some yellow bands representing the sunrise to sunset period (where temperatures are usually higher). Add this before the "chart = new Highcharts.Chart(options);"</p>
+
+                <pre>options.xAxis.plotBands = []
+for (var i = 31; i >= 0; i--) {
+  var d = new Date();
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate()-i);
+  var sunrise = d.getTime()+computeSunrise(dayOfYear(), true);
+  var sunset = d.getTime()+computeSunrise(dayOfYear(), false);
+  options.xAxis.plotBands.push({
+    from: sunrise,
+    to: sunset,
+    color: '#FCFFC5'
+  });
+};</pre>
+                <p>While I'm still looking for a cheap way to place an outside wireless sensor, I will be using <a href="http://simpleweatherjs.com/">SimpleWeather</a> to display current outside temperature, the data is provided by <a href="http://weather.yahoo.com/">Yahoo! Weather</a>. The <i>woeid</i> is the city code, you get get it <a href="http://woeid.rosselliot.co.nz/">here</a>.
+
+<pre>$.simpleWeather({
+    woeid: '742676',
+    unit: 'c',
+    success: function(weather) {
+        html = '&#60;h3>'+weather.city+', '+weather.country+'&#60;/h3>';
+        html += '&#60;img style="float:left; margin-top: 15px;" width="125px" src="'+weather.image+'">';
+        html += '&#60;p>'+weather.temp+'&amp;deg; '+weather.units.temp+'&#60;br />&#60;span>'+weather.currently+'</span>&#60;/p>';
+        html += '&#60;p>High: '+weather.high+'&amp;deg; Low: '+weather.low+'&amp;deg;&#60;br />';
+        html += 'Wind: '+weather.wind.direction+' '+weather.wind.speed+' '+weather.units.speed+'&#60;/p>';
+
+        $("#weather").html(html);
+    },
+    error: function(error) {
+        $("#weather").html('&#60;p>'+error+'&#60;/p>');
+    }
+});</pre>
+                <p>Most of the Javascript and CSS libraries are served directly from <a href="http://cdnjs.com/">Cloudflare CDNJS</a>, this is done to offload resources from the small RaspberryPi and speed up access time. The HTML/XML are served directly from my RaspberryPi running <a href="www.lighttpd.net">Lighttpd</a>.
+                <p>The Template used in this site is <a href="http://getbootstrap.com/2.3.2/index.html">Bootstrap</a>.
+              </div>
+           </div><!--/span-->
+         </div><!--/row-->
+
+         <hr>
+
+         <footer>
+           <p>&copy; Sam</p>
+         </footer>
+
+       </div><!--/.fluid-container-->
+    
+ 
+</body>
+</html>

@@ -1,0 +1,202 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Sam's Current Temperatures Solid Gauge with RaspberryPi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="5">
+
+    <!-- Le styles -->
+    <link href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/boo
+tstrap.min.css" rel="stylesheet">
+    <style type="text/css">
+      body {
+        padding-top: 60px;
+        padding-bottom: 40px;
+      }
+    </style>
+    <link href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/boo
+tstrap-responsive.min.css" rel="stylesheet">
+
+    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <!-- Le fav and touch icons -->
+    <link rel="shortcut icon" href="ico/favicon.ico">
+
+  </head>
+
+  <body>
+
+    <div class="navbar navbar-inverse navbar-fixed-top">
+         <div class="navbar-inner">
+           <div class="container-fluid">
+
+             <a class="brand" href="index.html">Sam's Current Temperatures Solid Gauge with RaspberryPi</a>
+
+             <div class="nav-collapse collapse">
+               <ul class="nav">
+                 <!-- <li class="active"><a href="index.html">Sam's Benchtest</a></li> -->
+                 <li><a href="howto.html">HowTo</a></li>
+                 <!-- <li><a href="#contact">Contact</a></li> -->
+               </ul>
+             </div>
+
+           </div>
+         </div>
+       </div>
+
+       <div class="container-fluid">
+         <div class="row-fluid">
+           <div class="span2">
+             <div class="well sidebar-nav">
+               <ul class="nav nav-list">
+                 <li class="nav-header">Temperature</li>
+                  <li><a href="index.html?3h">Last 3h</a></li>
+                  <li><a href="index.html">Last 24h</a></li>
+                  <li><a href="index.html?48h">Last 2 Days</a></li>
+                  <li><a href="index.html?1w">Last Week</a></li>
+                  <li><a href="index.html?1m">Last Month</a></li>
+                  <li><a href="index.html?3m">Last 3 Month</a></li>
+                  <li><a href="index.html?1y">Last Year</a></li>
+               </ul>
+             </div><!--/.well -->
+           </div><!--/span-->
+           <div class="span10">
+             <div id="content"></div>
+             <hr>
+             <div id="weather" style="margin-left: 20px;"></div>
+           </div><!--/span-->
+         </div><!--/row-->
+
+         <hr>
+
+         <footer>
+           <p>&copy; Sam</p>
+         </footer>
+
+       </div><!--/.fluid-container-->
+    <!-- Le javascript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/highcharts/2.3.5/highcharts.min.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/Chart.js/0.2.0/Chart.min.js" charset="utf-8"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/highcharts/4.0.3/highcharts-more.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/highcharts/4.0.3/modules/solid-gauge.src.js"></script>
+	<script src="//cdnjs.cloudflare.com/ajax/libs/extjs/4.2.1/ext-all.js" type="text/javascript"></script>
+    <script type="text/javascript">
+	$(function () {
+	
+    var gaugeOptions = {
+	
+	    chart: {
+	        type: 'solidgauge'
+	    },
+	    
+	    title: null,
+	    
+	    pane: {
+	    	center: ['50%', '85%'],
+	    	size: '140%',
+	        startAngle: -90,
+	        endAngle: 90,
+            background: {
+                backgroundColor: (Highcharts.theme && Highcharts.theme.background2) || '#EEE',
+                innerRadius: '60%',
+                outerRadius: '100%',
+                shape: 'arc'
+            }
+	    },
+
+	    tooltip: {
+	    	enabled: false
+	    },
+	       
+	    // the value axis
+	    yAxis: {
+			stops: [
+				[0.1, '#55BF3B'], // green
+	        	[0.5, '#DDDF0D'], // yellow
+	        	[0.9, '#DF5353'] // red
+			],
+			lineWidth: 0,
+            minorTickInterval: null,
+            tickPixelInterval: 400,
+            tickWidth: 0,
+	        title: {
+                y: -70
+	        },
+            labels: {
+                y: 16
+            }        
+	    },
+        
+        plotOptions: {
+            solidgauge: {
+                dataLabels: {
+                    y: 5,
+                    borderWidth: 0,
+                    useHTML: true
+                }
+            }
+        }
+    }}};
+    
+    // The Current Temp gauge
+    $('#container-curr_temp').highcharts(Highcharts.merge(gaugeOptions, {
+        yAxis: {
+	        min: 0,
+	        max: 125,
+	        title: {
+	            text: 'Current Temp'
+	        }       
+	    },
+
+	    credits: {
+	    	enabled: false
+	    },
+	
+	    series: [{
+	        name: 'Current Temp',
+	        data: [80],
+	        dataLabels: {
+	        	format: '<div style="text-align:center"><span style="font-size:25px;color:' + 
+                    ((Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black') + '">{y}</span><br/>' + 
+                   	'<span style="font-size:12px;color:silver">Celsius</span></div>'
+	        },
+	        tooltip: {
+	            valueSuffix: 'Celsius'
+	        }
+	    }]
+	
+	}));
+    
+    
+                               
+    // Bring life to the dials
+    setInterval(function () {
+    	// Speed
+        var chart = $('#container-speed').highcharts();
+        if (chart) {
+            var point = chart.series[0].points[0],
+                newVal,
+                inc = Math.round((Math.random() - 0.5) * 100);
+            
+            newVal = point.y + inc;
+            if (newVal < 0 || newVal > 125) {
+                newVal = point.y - inc;
+            }
+            
+            point.update(newVal);
+        }
+
+});
+</script>
+
+</body>
+</html>
